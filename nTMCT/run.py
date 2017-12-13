@@ -40,7 +40,7 @@ if __name__ == '__main__':
         if args.skip != '1':
             bookNLP.run_bookNLP(args.bookNLP, args.out, text, text_fn)
         charTable.create_char_table(args.out, text_fn)
-        charWordMatrix.create_word_character_matrix(text_fn)
+        charWordMatrix.create_word_character_matrix(args.out, text_fn)
         print("---- Done with: " + text + "! ----\n")
 
     print("Done!")
