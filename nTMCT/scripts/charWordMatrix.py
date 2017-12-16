@@ -26,6 +26,7 @@ MOD_FIND_WORDS_B = set(['amod', 'advmod', 'ccomp'])
 MOD_STOP_WORDS_B = set(['nsubj'])
 
 final_output = defaultdict(dict)
+remaining_words = []
 
 def is_verb(item):
     if item[12] == 'null' and 'VB' in item[10]:
@@ -33,11 +34,18 @@ def is_verb(item):
     else:
         return False
 
+# Try catch block that I use a lot so just extracting out to it's own function.
+def remove_item(item):
+    global remaining_words
+    try:
+        remaining_words.remove(item)
+    except ValueError:
+        pass # do nothing if the item doesn't exist in remaining_words.
+
 def agent(sentence, sentence_string):
     global AGENT_ID_WORDS
     global AGENT_FIND_WORDS
     global final_output
-
 
     char = '-1'
     assoc_words = []
@@ -48,6 +56,7 @@ def agent(sentence, sentence_string):
     for item in sentence:
         if char != '-1':
             if item[12] in AGENT_FIND_WORDS:
+                remove_item(item)
                 # Replace character mentions with their ID if possible.
                 if item[14] != '-1':
                     assoc_words.append(item[14])
@@ -60,6 +69,7 @@ def agent(sentence, sentence_string):
             # Search forward for null verbs.
             # If found, associate and remove from sentence.
             if is_verb(item):
+                remove_item(item)
                 null_exists = True
                 final_output[char].setdefault(item[9], 0)
                 final_output[char][item[9]] += 1
@@ -77,6 +87,9 @@ def agent(sentence, sentence_string):
             a_row = []
             char = item[14]
             if char != '-1':
+# PROB NEED TO DO SOMETHING HERE. NEED TO FIGURE OUT
+# IF REMOVE CHARACTERS FROM THE SENTENCES TOO.
+# I.E. THE THINGS THAT WE ARE ASSOCIATING WORDS WITH.
                 a_row.append(item[14])
 
     # CHANGE a_row to assoc_words to remove rows with no associated words
@@ -94,6 +107,7 @@ def agent(sentence, sentence_string):
         for item in reversed(sentence):
             if char != '-1':
                 if is_verb(item):
+                    remove_item(item)
                     final_output[char].setdefault(item[9], 0)
                     final_output[char][item[9]] += 1
                     assoc_words.append(item[9])
@@ -103,6 +117,9 @@ def agent(sentence, sentence_string):
                 a_row = []
                 char = item[14]
                 if char != '-1':
+# PROB NEED TO DO SOMETHING HERE. NEED TO FIGURE OUT
+# IF REMOVE CHARACTERS FROM THE SENTENCES TOO.
+# I.E. THE THINGS THAT WE ARE ASSOCIATING WORDS WITH.
                     a_row.append(item[14])
 
         # CHANGE a_row to assoc_words to remove rows with no associated words
@@ -134,6 +151,7 @@ def patient(sentence, sentence_string):
             if is_verb(item):
                 null_exists = True
             if item[12] in PATIENT_FIND_WORDS or is_verb(item):
+                remove_item(item)
                 if item[14] != '-1':
                     final_output[char].setdefault(item[14], 0)
                     final_output[char][item[14]] += 1
@@ -180,6 +198,7 @@ def possession(sentence, sentence_string):
     for item in sentence:
         if char != '-1':
             if item[12] in POSS_FIND_WORDS:
+                remove_item(item)
                 if item[14] != '-1':
                     final_output[char].setdefault(item[14], 0)
                     final_output[char][item[14]] += 1
@@ -229,6 +248,7 @@ def modification(sentence, sentence_string):
     for item in reversed(sentence):
         if char != '-1':
             if item[12] in MOD_FIND_WORDS_A:
+                remove_item(item)
                 if item[14] != '-1':
                     final_output[char].setdefault(item[14], 0)
                     final_output[char][item[14]] += 1
@@ -268,6 +288,7 @@ def modification(sentence, sentence_string):
                 char = '-1'
         if char != '-1':
             if item[12] in MOD_FIND_WORDS_B:
+                remove_item(item)
                 if item[14] != '-1':
                     final_output[char].setdefault(item[14], 0)
                     final_output[char][item[14]] += 1
@@ -340,6 +361,7 @@ def create_word_character_matrix(outDir, text):
             sys.exit()
 
     # Create the associations.csv file!
+    global remaining_words
     sentence = []
     char_assoc_agent = []
     char_assoc_patient = []
@@ -358,8 +380,13 @@ def create_word_character_matrix(outDir, text):
 
                 # If no character is in the sentence, skip.
                 if not char_in_sentence:
+                    for item in remaining_words:
+                        final_output['-1'].setdefault(item[9], 0)
+                        final_output['-1'][item[9]] += 1
+                    remaining_words = []
                     sentence = []
                     sentence.append(row)
+                    remaining_words.append(row)
                     continue
 
                 # DEBUG CODE: Reconstitute the sentence roughly, to show what
@@ -382,11 +409,16 @@ def create_word_character_matrix(outDir, text):
                 char_assoc_agent += agent(sentence, sentence_string)
 
                 sentence = []
+                for item in remaining_words:
+                    final_output['-1'].setdefault(item[9], 0)
+                    final_output['-1'][item[9]] += 1
+                remaining_words = []
                 char_in_sentence = False
 
             if row[11] == 'PERSON':
                 char_in_sentence = True
             sentence.append(row)
+            remaining_words.append(row)
 
     out_to_csv(char_assoc_agent, out_file_agent)
     out_to_csv(char_assoc_patient, out_file_patient)
